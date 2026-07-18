@@ -8,3 +8,6 @@ rusty-hook = "0.11.2"
 
 [dependencies]
 chrono = "0.4.45"
+
+[lints.rust]
+warnings = "deny"
