@@ -8,11 +8,11 @@ use crate::{
 use std::io::{BufRead, BufReader, Read};
 
 #[derive(Debug)]
-pub enum TransactionParseError {
+pub enum TransactionReadError {
     BadInputLine(String),
     FieldValue(TransactionFieldValueParseError),
 }
-impl std::fmt::Display for TransactionParseError {
+impl std::fmt::Display for TransactionReadError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::BadInputLine(line) => {
@@ -23,27 +23,27 @@ impl std::fmt::Display for TransactionParseError {
     }
 }
 
-fn parse_transaction(tx_line: &str) -> Result<Transaction, TransactionParseError> {
+fn parse_transaction(tx_line: &str) -> Result<Transaction, TransactionReadError> {
     let field_value_strs = tx_line
         .trim()
         .split(';')
         .collect::<Vec<&str>>()
         .try_into()
         .map_err(|components: Vec<&str>| {
-            TransactionParseError::BadInputLine(components.join(";"))
+            TransactionReadError::BadInputLine(components.join(";"))
         })?;
 
     let [date_str, category_str, type_str, amount_str] = field_value_strs;
 
     use TransactionFieldValueParseError as FVPE;
     let date = parse_transaction_date(date_str)
-        .map_err(|e| TransactionParseError::FieldValue(FVPE::Date(e)))?;
+        .map_err(|e| TransactionReadError::FieldValue(FVPE::Date(e)))?;
     let category = parse_transaction_category(category_str)
-        .map_err(|e| TransactionParseError::FieldValue(FVPE::Category(e)))?;
+        .map_err(|e| TransactionReadError::FieldValue(FVPE::Category(e)))?;
     let type_ = parse_transaction_type(type_str)
-        .map_err(|e| TransactionParseError::FieldValue(FVPE::Type(e)))?;
+        .map_err(|e| TransactionReadError::FieldValue(FVPE::Type(e)))?;
     let amount = parse_transaction_amount(amount_str)
-        .map_err(|e| TransactionParseError::FieldValue(FVPE::Amount(e)))?;
+        .map_err(|e| TransactionReadError::FieldValue(FVPE::Amount(e)))?;
 
     Ok(Transaction {
         type_,
@@ -53,7 +53,7 @@ fn parse_transaction(tx_line: &str) -> Result<Transaction, TransactionParseError
     })
 }
 
-pub fn read_transactions<R: Read>(r: R) -> Result<Vec<crate::Transaction>, TransactionParseError> {
+pub fn read_transactions<R: Read>(r: R) -> Result<Vec<crate::Transaction>, TransactionReadError> {
     let reader = BufReader::new(r);
     let mut result: Vec<Transaction> = vec![];
 
@@ -66,11 +66,11 @@ pub fn read_transactions<R: Read>(r: R) -> Result<Vec<crate::Transaction>, Trans
 
 #[cfg(test)]
 mod tests {
-    use super::{TransactionParseError, read_transactions};
+    use super::{TransactionReadError, read_transactions};
     use crate::{Transaction, TransactionType};
 
     #[test]
-    fn read_transactions_read_all() -> Result<(), TransactionParseError> {
+    fn read_transactions_read_all() -> Result<(), TransactionReadError> {
         let r = std::io::Cursor::new(String::from(
             "\
             2026-04-01;salary;income;120000\n\
