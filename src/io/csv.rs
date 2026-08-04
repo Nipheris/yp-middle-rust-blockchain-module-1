@@ -1,12 +1,17 @@
 use std::{
     collections::HashMap,
     io::{BufRead, BufReader, Read},
-    todo,
 };
 
 use crate::{
     Transaction,
-    io::{csv::TransactionReadError::BadHeaderLine, parsing::TransactionFieldValueParseError},
+    io::{
+        csv::TransactionReadError::BadHeaderLine,
+        parsing::{
+            TransactionFieldValueParseError, parse_transaction_amount, parse_transaction_category,
+            parse_transaction_date, parse_transaction_type,
+        },
+    },
 };
 
 #[derive(Debug)]
@@ -39,7 +44,7 @@ enum TransactionField {
     Category,
     Amount,
 }
-type TransactionFieldIndex = u8;
+type TransactionFieldIndex = usize;
 type TransactionFieldIndexMap = HashMap<TransactionField, TransactionFieldIndex>;
 fn parse_header(header_line: &str) -> Result<TransactionFieldIndexMap, TransactionReadError> {
     let mut result = TransactionFieldIndexMap::new();
@@ -53,22 +58,57 @@ fn parse_header(header_line: &str) -> Result<TransactionFieldIndexMap, Transacti
             TransactionReadError::BadHeaderLine(components.join(","))
         })?;
 
-    for _field_name in field_names {
-        result.insert(TransactionField::Type, 0);
-        result.insert(TransactionField::Date, 1);
-        result.insert(TransactionField::Category, 2);
-        result.insert(TransactionField::Amount, 3);
-        todo!();
+    for (field_index, field_name) in field_names.iter().enumerate() {
+        match *field_name {
+            "kind" => result.insert(TransactionField::Type, field_index),
+            "date" => result.insert(TransactionField::Date, field_index),
+            "category" => result.insert(TransactionField::Category, field_index),
+            "amount" => result.insert(TransactionField::Amount, field_index),
+            _ => {
+                return Err(TransactionReadError::BadHeaderLine(
+                    "unknown field".to_string(),
+                ));
+            }
+        };
     }
 
     Ok(result)
 }
 
 fn parse_transaction(
-    _tx_line: &str,
-    _field_index_map: &TransactionFieldIndexMap,
+    tx_line: &str,
+    field_index_map: &TransactionFieldIndexMap,
 ) -> Result<Transaction, TransactionReadError> {
-    todo!();
+    let field_value_strs: [&str; 4] = tx_line
+        .trim()
+        .split(',') // comma-separated, isn't it? :)
+        .collect::<Vec<&str>>()
+        .try_into()
+        .map_err(|components: Vec<&str>| {
+            TransactionReadError::BadHeaderLine(components.join(","))
+        })?;
+
+    let date_str = field_value_strs[field_index_map[&TransactionField::Date]];
+    let category_str = field_value_strs[field_index_map[&TransactionField::Category]];
+    let type_str = field_value_strs[field_index_map[&TransactionField::Type]];
+    let amount_str = field_value_strs[field_index_map[&TransactionField::Amount]];
+
+    use TransactionFieldValueParseError as FVPE;
+    let date = parse_transaction_date(date_str)
+        .map_err(|e| TransactionReadError::FieldValue(FVPE::Date(e)))?;
+    let category = parse_transaction_category(category_str)
+        .map_err(|e| TransactionReadError::FieldValue(FVPE::Category(e)))?;
+    let type_ = parse_transaction_type(type_str)
+        .map_err(|e| TransactionReadError::FieldValue(FVPE::Type(e)))?;
+    let amount = parse_transaction_amount(amount_str)
+        .map_err(|e| TransactionReadError::FieldValue(FVPE::Amount(e)))?;
+
+    Ok(Transaction {
+        type_,
+        date,
+        category,
+        amount,
+    })
 }
 
 pub fn read_transactions<R: Read>(r: R) -> Result<Vec<crate::Transaction>, TransactionReadError> {
@@ -95,31 +135,36 @@ mod tests {
 
     #[test]
     fn read_transactions_read_all() -> Result<(), TransactionReadError> {
-        let r = std::io::Cursor::new(String::from(
+        let expected = [
+            Transaction {
+                type_: TransactionType::Income,
+                date: chrono::NaiveDate::from_ymd_opt(2026, 04, 01).unwrap(),
+                category: String::from("salary"),
+                amount: 120000,
+            },
+            Transaction {
+                type_: TransactionType::Expense,
+                date: chrono::NaiveDate::from_ymd_opt(2026, 04, 02).unwrap(),
+                category: String::from("rent"),
+                amount: 40000,
+            },
+        ];
+
+        let r1 = std::io::Cursor::new(String::from(
             "\
             date,category,kind,amount\n\
             2026-04-01,salary,income,120000\n\
             2026-04-02,rent,expense,40000\n",
         ));
+        assert_eq!(read_transactions(r1)?, expected);
 
-        let transactions = read_transactions(r)?;
-        assert_eq!(
-            transactions,
-            [
-                Transaction {
-                    type_: TransactionType::Income,
-                    date: chrono::NaiveDate::from_ymd_opt(2026, 04, 01).unwrap(),
-                    category: String::from("salary"),
-                    amount: 120000
-                },
-                Transaction {
-                    type_: TransactionType::Expense,
-                    date: chrono::NaiveDate::from_ymd_opt(2026, 5, 16).unwrap(),
-                    category: String::from("travel"),
-                    amount: 6000
-                },
-            ]
-        );
+        let r2 = std::io::Cursor::new(String::from(
+            "\
+            category,date,amount,kind\n\
+            salary,2026-04-01,120000,income\n\
+            rent,2026-04-02,40000,expense  \n",
+        ));
+        assert_eq!(read_transactions(r2)?, expected);
 
         Ok(())
     }
