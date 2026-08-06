@@ -35,15 +35,11 @@ fn parse_transaction(tx_line: &str) -> Result<Transaction, TransactionReadError>
 
     let [date_str, category_str, type_str, amount_str] = field_value_strs;
 
-    use TransactionFieldValueParseError as FVPE;
-    let date = parse_transaction_date(date_str)
-        .map_err(|e| TransactionReadError::FieldValue(FVPE::Date(e)))?;
-    let category = parse_transaction_category(category_str)
-        .map_err(|e| TransactionReadError::FieldValue(FVPE::Category(e)))?;
-    let type_ = parse_transaction_type(type_str)
-        .map_err(|e| TransactionReadError::FieldValue(FVPE::Type(e)))?;
-    let amount = parse_transaction_amount(amount_str)
-        .map_err(|e| TransactionReadError::FieldValue(FVPE::Amount(e)))?;
+    let date = parse_transaction_date(date_str).map_err(TransactionReadError::FieldValue)?;
+    let category =
+        parse_transaction_category(category_str).map_err(TransactionReadError::FieldValue)?;
+    let type_ = parse_transaction_type(type_str).map_err(TransactionReadError::FieldValue)?;
+    let amount = parse_transaction_amount(amount_str).map_err(TransactionReadError::FieldValue)?;
 
     Ok(Transaction {
         type_,

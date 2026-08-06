@@ -1,8 +1,8 @@
 use crate::TransactionType;
-use chrono::{NaiveDate, ParseError as ChronoParseError, ParseResult as ChronoParseResult};
+use chrono::{NaiveDate, ParseError as ChronoParseError};
 use std::num::ParseIntError;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum TransactionFieldValueParseError {
     Type(String),
     Date(ChronoParseError),
@@ -20,27 +20,39 @@ impl std::fmt::Display for TransactionFieldValueParseError {
     }
 }
 
-pub fn parse_transaction_type(type_str: &str) -> Result<TransactionType, String> {
+pub fn parse_transaction_type(
+    type_str: &str,
+) -> Result<TransactionType, TransactionFieldValueParseError> {
     match type_str {
         "income" => Ok(TransactionType::Income),
         "expense" => Ok(TransactionType::Expense),
-        _ => Err(String::from(type_str)),
+        _ => Err(TransactionFieldValueParseError::Type(String::from(
+            type_str,
+        ))),
     }
 }
 
-pub fn parse_transaction_date(date_str: &str) -> ChronoParseResult<NaiveDate> {
-    NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
+pub fn parse_transaction_date(
+    date_str: &str,
+) -> Result<NaiveDate, TransactionFieldValueParseError> {
+    NaiveDate::parse_from_str(date_str, "%Y-%m-%d").map_err(TransactionFieldValueParseError::Date)
 }
 
-pub fn parse_transaction_category(category_str: &str) -> Result<String, String> {
+pub fn parse_transaction_category(
+    category_str: &str,
+) -> Result<String, TransactionFieldValueParseError> {
     match category_str {
-        "" => Err(String::from(category_str)),
+        "" => Err(TransactionFieldValueParseError::Category(String::from(
+            category_str,
+        ))),
         _ => Ok(String::from(category_str)),
     }
 }
 
-pub fn parse_transaction_amount(amount_str: &str) -> Result<u64, ParseIntError> {
-    amount_str.parse::<u64>()
+pub fn parse_transaction_amount(amount_str: &str) -> Result<u64, TransactionFieldValueParseError> {
+    amount_str
+        .parse::<u64>()
+        .map_err(TransactionFieldValueParseError::Amount)
 }
 
 #[cfg(test)]
