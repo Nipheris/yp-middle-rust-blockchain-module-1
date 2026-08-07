@@ -36,6 +36,11 @@ impl std::fmt::Display for TransactionReadError {
         }
     }
 }
+impl From<TransactionFieldValueParseError> for TransactionReadError {
+    fn from(value: TransactionFieldValueParseError) -> Self {
+        TransactionReadError::FieldValue(value)
+    }
+}
 
 #[derive(Eq, PartialEq, Hash)]
 enum TransactionField {
@@ -93,11 +98,10 @@ fn parse_transaction(
     let type_str = field_value_strs[field_index_map[&TransactionField::Type]];
     let amount_str = field_value_strs[field_index_map[&TransactionField::Amount]];
 
-    let date = parse_transaction_date(date_str).map_err(TransactionReadError::FieldValue)?;
-    let category =
-        parse_transaction_category(category_str).map_err(TransactionReadError::FieldValue)?;
-    let type_ = parse_transaction_type(type_str).map_err(TransactionReadError::FieldValue)?;
-    let amount = parse_transaction_amount(amount_str).map_err(TransactionReadError::FieldValue)?;
+    let date = parse_transaction_date(date_str)?;
+    let category = parse_transaction_category(category_str)?;
+    let type_ = parse_transaction_type(type_str)?;
+    let amount = parse_transaction_amount(amount_str)?;
 
     Ok(Transaction {
         type_,

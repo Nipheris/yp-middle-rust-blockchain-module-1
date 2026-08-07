@@ -22,6 +22,11 @@ impl std::fmt::Display for TransactionReadError {
         }
     }
 }
+impl From<TransactionFieldValueParseError> for TransactionReadError {
+    fn from(value: TransactionFieldValueParseError) -> Self {
+        TransactionReadError::FieldValue(value)
+    }
+}
 
 fn parse_transaction(tx_line: &str) -> Result<Transaction, TransactionReadError> {
     let field_value_strs = tx_line
@@ -35,11 +40,10 @@ fn parse_transaction(tx_line: &str) -> Result<Transaction, TransactionReadError>
 
     let [date_str, category_str, type_str, amount_str] = field_value_strs;
 
-    let date = parse_transaction_date(date_str).map_err(TransactionReadError::FieldValue)?;
-    let category =
-        parse_transaction_category(category_str).map_err(TransactionReadError::FieldValue)?;
-    let type_ = parse_transaction_type(type_str).map_err(TransactionReadError::FieldValue)?;
-    let amount = parse_transaction_amount(amount_str).map_err(TransactionReadError::FieldValue)?;
+    let date = parse_transaction_date(date_str)?;
+    let category = parse_transaction_category(category_str)?;
+    let type_ = parse_transaction_type(type_str)?;
+    let amount = parse_transaction_amount(amount_str)?;
 
     Ok(Transaction {
         type_,
